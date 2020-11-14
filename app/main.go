@@ -16,7 +16,7 @@ import (
 func predictionJob(jobID int) {
 	fmt.Printf("prediction job started for %d\n", jobID)
 
-	api := io.NewAPI()
+	api := api()
 
 	periods, err := api.GetPeriods(jobID, 30)
 	if err != nil {
@@ -63,7 +63,7 @@ func predictionJob(jobID int) {
 func main() {
 	scheduler := gocron.NewScheduler(time.UTC)
 
-	queue := createQueue(io.NewAPI())
+	queue := createQueue(api())
 
 	var err error
 
@@ -116,6 +116,16 @@ func createQueue(api io.API) []queueItem {
 	}
 
 	return result
+}
+
+var apiInstance io.API //nolint:gochecknoglobals // because
+
+func api() io.API {
+	if apiInstance == nil {
+		apiInstance = io.NewAPI()
+	}
+
+	return apiInstance
 }
 
 func indexPredictions(predictions []io.Prediction) map[int]time.Time {
