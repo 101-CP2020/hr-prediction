@@ -117,7 +117,7 @@ linters-settings:
     # simplify code: gofmt with `-s` option, true by default
     simplify: true
   goimports:
-    local-prefixes: buroburo.ru/bdp/cli
+    local-prefixes: hz.ru/hz
   golint:
     # minimal confidence for issues, default is 0.8
     min-confidence: 0.8
@@ -295,6 +295,3 @@ issues:
 
   # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
   max-same-issues: 0
-
-  # Disable issues after golangci-lint update
-  new-from-rev: b284a151

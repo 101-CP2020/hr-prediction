@@ -1,24 +1,13 @@
 package prediction
 
 import (
-	"time"
+	"hz.ru/hz/io"
 
 	linearmodel "github.com/pa-m/sklearn/linear_model"
 	"gonum.org/v1/gonum/mat"
 )
 
-type Period struct {
-	Time  time.Time
-	Value int
-}
-
-type Prediction struct {
-	Month3  int
-	Month6  int
-	Month12 int
-}
-
-const quartile = time.Hour * 24 * 28 * 3
+type Period = io.Period
 
 func MakePrediction(periods, predictionPeriods []Period) []Period {
 	predictor := linearmodel.NewLinearRegression()

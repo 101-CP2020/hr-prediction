@@ -1,6 +1,8 @@
 package prediction
 
 import (
+	"hz.ru/hz/util"
+
 	"testing"
 	"time"
 
@@ -27,9 +29,9 @@ func TestMakePrediction(t *testing.T) {
 		},
 	}
 
-	quartile1 := time.Now().Add(quartile)
-	quartile2 := time.Now().Add(quartile * 2)
-	quartile4 := time.Now().Add(quartile * 4)
+	quartile1 := time.Now().Add(util.Quartile)
+	quartile2 := time.Now().Add(util.Quartile * 2)
+	quartile4 := time.Now().Add(util.Quartile * 4)
 
 	predictionPeriods := []Period{
 		{
