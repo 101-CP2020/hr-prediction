@@ -1,29 +1,35 @@
 package io
 
 import (
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 	"time"
-
-	"github.com/imroc/req"
 )
 
 const apiURL = ""
 
 type Job struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
+	ID   int    `gorm:"column:okpdtr"`
+	Name string `gorm:"column:title"`
+}
+
+type PeriodInt struct {
+	Time  int `gorm:"column:month_year"`
+	Value int `gorm:"column:total"`
 }
 
 type Period struct {
-	Time  time.Time `json:"time"`
-	Value int       `json:"value"`
+	Time  time.Time
+	Value int
 }
 
 type Prediction struct {
-	JobID   int       `json:"job_id"`
-	Time    time.Time `json:"time"`
-	Month3  int       `json:"month_3"`
-	Month6  int       `json:"month_6"`
-	Month12 int       `json:"month_12"`
+	ID      int   `gorm:"column:id"`
+	JobID   int   `gorm:"column:okpdtr"`
+	Time    int64 `gorm:"column:created_at"`
+	Month3  int   `gorm:"column:month_3_value"`
+	Month6  int   `gorm:"column:month_6_value"`
+	Month12 int   `gorm:"column:month_12_value"`
 }
 
 type API interface {
@@ -34,69 +40,76 @@ type API interface {
 }
 
 func NewAPI() API {
-	return apiImpl{}
-}
-
-type apiImpl struct{}
-
-func (apiImpl) GetJobs() ([]Job, error) {
-	response, err := req.Get(apiURL + "jobs")
+	dsn := "user=db_user password=db_pwd dbname=hr_db host=92.63.103.157 port=7080"
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
+	return apiImpl{
+		db: db,
+	}
+}
+
+type apiImpl struct {
+	db *gorm.DB
+}
+
+func (api apiImpl) GetJobs() ([]Job, error) {
 	var result []Job
 
-	err = response.ToJSON(&result)
-	if err != nil {
-		return nil, err
+	queryResult := api.db.Table("tbl_okpdtr").Find(&result)
+	if queryResult.Error != nil {
+		return nil, queryResult.Error
 	}
 
 	return result, nil
 }
 
-func (apiImpl) GetPeriods(jobID, periodDays int) ([]Period, error) {
-	params := req.Param{
-		"id":     jobID,
-		"period": periodDays,
-	}
+func (api apiImpl) GetPeriods(jobID, periodDays int) ([]Period, error) {
+	var dbResult []PeriodInt
 
-	response, err := req.Get(apiURL+"periods", params)
-	if err != nil {
-		return nil, err
+	queryResult := api.db.
+		Table("tbl_vacancies").
+		Select("month_year, sum(number) as total").
+		Group("month_year").
+		Where("okpdtr = ?", jobID).
+		Find(&dbResult)
+
+	if queryResult.Error != nil {
+		return nil, queryResult.Error
 	}
 
 	var result []Period
 
-	err = response.ToJSON(&result)
-	if err != nil {
-		return nil, err
+	for _, periodInt := range dbResult {
+		year := periodInt.Time % 10000
+		month := periodInt.Time / 10000
+
+		date := time.Date(year, time.Month(month), 0, 0, 0, 0, 0, time.UTC)
+
+		result = append(result, Period{
+			Time:  date,
+			Value: periodInt.Value,
+		})
 	}
 
 	return result, nil
 }
 
-func (apiImpl) GetPredictions() ([]Prediction, error) {
-	response, err := req.Get(apiURL + "predictions")
-	if err != nil {
-		return nil, err
-	}
-
+func (api apiImpl) GetPredictions() ([]Prediction, error) {
 	var result []Prediction
 
-	err = response.ToJSON(&result)
-	if err != nil {
-		return nil, err
+	queryResult := api.db.Table("tbl_predictions").Find(&result).Limit(10000)
+	if queryResult.Error != nil {
+		return nil, queryResult.Error
 	}
 
 	return result, nil
 }
 
-func (apiImpl) WritePrediction(prediction Prediction) error {
-	_, err := req.Post(apiURL+"predictions", req.BodyJSON(&prediction))
-	if err != nil {
-		return err
-	}
+func (api apiImpl) WritePrediction(prediction Prediction) error {
+	result := api.db.Table("tbl_predictions").Create(&prediction)
 
-	return nil
+	return result.Error
 }

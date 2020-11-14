@@ -2,63 +2,15 @@ package main
 
 import (
 	"fmt"
+	"github.com/go-co-op/gocron"
+	"github.com/hashicorp/go-multierror"
 	"log"
 	"time"
 
 	"hz.ru/hz/io"
 	"hz.ru/hz/prediction"
 	"hz.ru/hz/util"
-
-	"github.com/go-co-op/gocron"
-	"github.com/hashicorp/go-multierror"
 )
-
-func predictionJob(jobID int) {
-	fmt.Printf("prediction job started for %d\n", jobID)
-
-	api := api()
-
-	periods, err := api.GetPeriods(jobID, 30)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	now := time.Now()
-
-	predictions := []io.Period{
-		{
-			Time:  now.Add(util.Quartile),
-			Value: 0,
-		},
-		{
-			Time:  now.Add(util.Quartile * 2), //nolint:gomnd // because
-			Value: 0,
-		},
-		{
-			Time:  now.Add(util.Quartile * 4), //nolint:gomnd // because
-			Value: 0,
-		},
-	}
-
-	predictionsResult := prediction.MakePrediction(periods, predictions)
-
-	result := io.Prediction{
-		JobID:   jobID,
-		Time:    now,
-		Month3:  predictionsResult[0].Value,
-		Month6:  predictionsResult[1].Value,
-		Month12: predictionsResult[2].Value,
-	}
-
-	err = api.WritePrediction(result)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	fmt.Printf("prediction job done for %d\n", jobID)
-}
 
 func main() {
 	scheduler := gocron.NewScheduler(time.UTC)
@@ -79,6 +31,60 @@ func main() {
 	}
 
 	scheduler.StartBlocking()
+}
+
+func predictionJob(jobID int) {
+	fmt.Printf("prediction job started for %d\n", jobID)
+
+	api := api()
+
+	periods, err := api.GetPeriods(jobID, 30)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	if len(periods) < 2 {
+		fmt.Printf("job %d: not enough data for prediction\n", jobID)
+
+		return
+	}
+
+	fmt.Printf("job %d: got previous periods, making prediction\n", jobID)
+
+	now := time.Now()
+
+	predictions := []io.Period{
+		{
+			Time: now.Add(util.Quartile),
+		},
+		{
+			Time: now.Add(util.Quartile * 2), //nolint:gomnd // because
+		},
+		{
+			Time: now.Add(util.Quartile * 4), //nolint:gomnd // because
+		},
+	}
+
+	predictionsResult := prediction.MakePrediction(periods, predictions)
+
+	result := io.Prediction{
+		JobID:   jobID,
+		Time:    now.Unix(),
+		Month3:  predictionsResult[0].Value,
+		Month6:  predictionsResult[1].Value,
+		Month12: predictionsResult[2].Value,
+	}
+
+	fmt.Printf("job %d: writing prediction result\n", jobID)
+
+	err = api.WritePrediction(result)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	fmt.Printf("job %d: prediction done\n", jobID)
 }
 
 type queueItem struct {
@@ -104,7 +110,7 @@ func createQueue(api io.API) []queueItem {
 	for i, job := range jobs {
 		lastPredictionTime, found := index[job.ID]
 
-		startTime := time.Now().Add(time.Duration(i))
+		startTime := time.Now().Add(time.Duration(i) * time.Second)
 		if found {
 			startTime = lastPredictionTime.Add(util.Month)
 		}
@@ -132,7 +138,7 @@ func indexPredictions(predictions []io.Prediction) map[int]time.Time {
 	result := map[int]time.Time{}
 
 	for _, prediction := range predictions {
-		result[prediction.JobID] = prediction.Time
+		result[prediction.JobID] = time.Unix(prediction.Time, 0)
 	}
 
 	return result

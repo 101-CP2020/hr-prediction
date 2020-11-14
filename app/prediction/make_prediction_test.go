@@ -12,20 +12,16 @@ import (
 func TestMakePrediction(t *testing.T) {
 	periods := []Period{
 		{
-			Time:  time.Now().Add(-time.Hour * 24 * 90),
-			Value: 97,
+			Time:  time.Now().Add(-util.Quartile * 4),
+			Value: 52,
 		},
 		{
-			Time:  time.Now().Add(-time.Hour * 24 * 180),
-			Value: 156,
+			Time:  time.Now().Add(-util.Quartile * 8),
+			Value: 24,
 		},
 		{
-			Time:  time.Now().Add(-time.Hour * 24 * 360),
-			Value: 131,
-		},
-		{
-			Time:  time.Now().Add(-time.Hour * 24 * 720),
-			Value: 164,
+			Time:  time.Now().Add(-util.Quartile * 12),
+			Value: 24,
 		},
 	}
 
